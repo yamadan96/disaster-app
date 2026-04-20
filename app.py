@@ -151,9 +151,11 @@ def create_app() -> gr.Blocks:
 
 NUM_DISPLAY_CLASSES = 6
 
+# Initialize at module load (required for HF Spaces)
+_initialize_predictor()
+demo = create_app()
+
 if __name__ == "__main__":
-    _initialize_predictor()
-    demo = create_app()
     port = int(os.environ.get("GRADIO_SERVER_PORT", 7860))
     demo.launch(
         server_name="0.0.0.0",
