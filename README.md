@@ -2,7 +2,7 @@
 title: Disaster Building Damage Assessment
 emoji: 🏚️
 colorFrom: red
-colorTo: orange
+colorTo: red
 sdk: gradio
 sdk_version: "4.0.0"
 app_file: app.py
