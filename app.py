@@ -1,0 +1,148 @@
+"""Gradio web application for disaster building damage assessment.
+
+Launch with:
+    CHECKPOINT_DIR=/path/to/checkpoint/dir uv run python app.py
+"""
+
+import logging
+import os
+from pathlib import Path
+
+import gradio as gr
+from PIL import Image
+
+from src.predictor import CLASS_NAMES, REJECTION_THRESHOLD, Predictor
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+
+def _initialize_predictor() -> Predictor:
+    """Initialize the singleton predictor from environment variables."""
+    checkpoint_dir = os.environ.get("CHECKPOINT_DIR")
+    if checkpoint_dir is None:
+        raise RuntimeError(
+            "CHECKPOINT_DIR environment variable is required. "
+            "Set it to the directory containing best_model.pth."
+        )
+
+    checkpoint_path = Path(checkpoint_dir)
+    if not checkpoint_path.exists():
+        raise RuntimeError(f"CHECKPOINT_DIR does not exist: {checkpoint_path}")
+
+    device = os.environ.get("DEVICE", "cuda")
+    predictor = Predictor()
+    predictor.initialize(checkpoint_dir=checkpoint_path, device=device)
+    return predictor
+
+
+def predict_image(
+    image: Image.Image | None,
+) -> tuple[str, dict[str, float]]:
+    """Run prediction and format results for Gradio.
+
+    Parameters
+    ----------
+    image : Image.Image | None
+        Input image from Gradio image component.
+
+    Returns
+    -------
+    tuple[str, dict[str, float]]
+        A status message and a dictionary of class probabilities for
+        ``gr.Label``.
+    """
+    if image is None:
+        return "画像をアップロードしてください。", {}
+
+    predictor = Predictor()
+
+    try:
+        result = predictor.predict(image)
+    except RuntimeError:
+        logger.exception("Prediction failed")
+        return "モデルが初期化されていません。", {}
+
+    # Build label dict for gr.Label
+    label_dict = {CLASS_NAMES[i]: prob for i, prob in enumerate(result.probabilities)}
+
+    if result.rejected:
+        status = (
+            f"⚠ 判定不能（信頼度不足）\n"
+            f"最も可能性の高いクラス: {result.class_name}\n"
+            f"信頼度: {result.confidence:.1%} "
+            f"(閾値: {REJECTION_THRESHOLD:.0%} 未満のため棄却)"
+        )
+    else:
+        status = f"判定結果: {result.class_name}\n信頼度: {result.confidence:.1%}"
+
+    return status, label_dict
+
+
+def create_app() -> gr.Blocks:
+    """Build and return the Gradio Blocks application."""
+    with gr.Blocks(
+        title="災害建物被害判定システム",
+        theme=gr.themes.Soft(),
+    ) as demo:
+        gr.Markdown(
+            "# 災害建物被害判定システム\n"
+            "建物画像をアップロードすると被害クラスを判定します "
+            "(DINOv2 + LoRA)\n\n"
+            "**クラス**: 被害なし / E1(地震大) / E2(地震中) / "
+            "E3(地震小) / T1(津波大) / T3(津波小)"
+        )
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                image_input = gr.Image(
+                    type="pil",
+                    label="建物画像",
+                    height=400,
+                )
+                submit_btn = gr.Button(
+                    "判定する",
+                    variant="primary",
+                    size="lg",
+                )
+
+            with gr.Column(scale=1):
+                status_output = gr.Textbox(
+                    label="判定結果",
+                    lines=3,
+                    interactive=False,
+                )
+                label_output = gr.Label(
+                    label="クラス別確率",
+                    num_top_classes=NUM_DISPLAY_CLASSES,
+                )
+
+        submit_btn.click(
+            fn=predict_image,
+            inputs=[image_input],
+            outputs=[status_output, label_output],
+        )
+
+        image_input.change(
+            fn=predict_image,
+            inputs=[image_input],
+            outputs=[status_output, label_output],
+        )
+
+    return demo
+
+
+NUM_DISPLAY_CLASSES = 6
+
+if __name__ == "__main__":
+    _initialize_predictor()
+    demo = create_app()
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
+    )
