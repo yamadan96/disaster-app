@@ -4,5 +4,4 @@ __pycache__/
 .venv/
 .ruff_cache/
 __pycache__/
-uv.lock
 .venv/
