@@ -21,20 +21,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _initialize_predictor() -> Predictor:
-    """Initialize the singleton predictor from environment variables."""
+def _resolve_checkpoint_dir() -> Path:
+    """Resolve checkpoint directory from env var or HF Hub download."""
     checkpoint_dir = os.environ.get("CHECKPOINT_DIR")
-    if checkpoint_dir is None:
-        raise RuntimeError(
-            "CHECKPOINT_DIR environment variable is required. "
-            "Set it to the directory containing best_model.pth."
+    if checkpoint_dir is not None:
+        path = Path(checkpoint_dir)
+        if path.exists():
+            return path
+
+    # Download from HF Hub (for HuggingFace Spaces deployment)
+    from huggingface_hub import hf_hub_download
+    cache_dir = Path("/tmp/disaster-app-checkpoint")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    model_path = cache_dir / "best_model.pth"
+    if not model_path.exists():
+        logger.info("Downloading model from HuggingFace Hub...")
+        hf_hub_download(
+            repo_id="yuto090612/disaster-app-model",
+            filename="best_model.pth",
+            local_dir=str(cache_dir),
         )
+    return cache_dir
 
-    checkpoint_path = Path(checkpoint_dir)
-    if not checkpoint_path.exists():
-        raise RuntimeError(f"CHECKPOINT_DIR does not exist: {checkpoint_path}")
 
-    device = os.environ.get("DEVICE", "cuda")
+def _initialize_predictor() -> Predictor:
+    """Initialize the singleton predictor."""
+    checkpoint_path = _resolve_checkpoint_dir()
+    device = os.environ.get("DEVICE", "cuda" if __import__("torch").cuda.is_available() else "cpu")
     predictor = Predictor()
     predictor.initialize(checkpoint_dir=checkpoint_path, device=device)
     return predictor
@@ -141,8 +154,9 @@ NUM_DISPLAY_CLASSES = 6
 if __name__ == "__main__":
     _initialize_predictor()
     demo = create_app()
+    port = int(os.environ.get("GRADIO_SERVER_PORT", 7860))
     demo.launch(
         server_name="0.0.0.0",
-        server_port=7860,
+        server_port=port,
         share=False,
     )
