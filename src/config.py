@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class InferenceConfig:
     """Minimal configuration for inference-only usage.
 
-    Defaults match the baseline_s42_aux checkpoint.
+    Defaults match the released checkpoint (LoRA on DINOv2 with auxiliary heads).
     """
 
     # Model architecture

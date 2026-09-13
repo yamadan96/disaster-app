@@ -11,7 +11,7 @@ from pathlib import Path
 import gradio as gr
 from PIL import Image
 
-from src.predictor import CLASS_NAMES, REJECTION_THRESHOLD, Predictor
+from src.predictor import CLASS_NAMES, REJECTION_THRESHOLD, Predictor, default_device
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +31,7 @@ def _resolve_checkpoint_dir() -> Path:
 
     # Download from HF Hub (for HuggingFace Spaces deployment)
     from huggingface_hub import hf_hub_download
+
     cache_dir = Path("/tmp/disaster-app-checkpoint")
     cache_dir.mkdir(parents=True, exist_ok=True)
     model_path = cache_dir / "best_model.pth"
@@ -47,7 +48,7 @@ def _resolve_checkpoint_dir() -> Path:
 def _initialize_predictor() -> Predictor:
     """Initialize the singleton predictor."""
     checkpoint_path = _resolve_checkpoint_dir()
-    device = os.environ.get("DEVICE", "cuda" if __import__("torch").cuda.is_available() else "cpu")
+    device = os.environ.get("DEVICE", default_device())
     predictor = Predictor()
     predictor.initialize(checkpoint_dir=checkpoint_path, device=device)
     return predictor

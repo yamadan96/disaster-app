@@ -26,6 +26,11 @@ CLASS_NAMES: list[str] = [
 REJECTION_THRESHOLD = 0.5
 
 
+def default_device() -> str:
+    """Return ``"cuda"`` when a GPU is available, otherwise ``"cpu"``."""
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 @dataclass(frozen=True)
 class PredictionResult:
     """Immutable container for a single prediction."""

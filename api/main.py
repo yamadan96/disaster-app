@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, UploadFile
 from PIL import Image
 from pydantic import BaseModel
 
-from src.predictor import CLASS_NAMES, Predictor
+from src.predictor import CLASS_NAMES, Predictor, default_device
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if not checkpoint_path.exists():
         raise RuntimeError(f"CHECKPOINT_DIR does not exist: {checkpoint_path}")
 
-    device = os.environ.get("DEVICE", "cuda")
+    device = os.environ.get("DEVICE", default_device())
     predictor = Predictor()
     predictor.initialize(checkpoint_dir=checkpoint_path, device=device)
     logger.info("FastAPI application started with model on %s", device)
