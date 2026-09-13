@@ -1,6 +1,6 @@
 """DINOv2 multi-head model for disaster building damage assessment.
 
-Ported from hisaichi research code — simplified to inference-only,
+Adapted from earlier research code — simplified to inference-only,
 original_only ROI mode (no two_stream, no CoVT, no cascade).
 """
 
